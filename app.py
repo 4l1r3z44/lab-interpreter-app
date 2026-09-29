@@ -35,7 +35,7 @@ if uploaded_file is not None:
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
                 # 2x zoom preserves legibility of small lab reference tables
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))
                 png_bytes = pix.tobytes("png")
                 
                 base64_payloads.append(get_base64_from_image(png_bytes))
