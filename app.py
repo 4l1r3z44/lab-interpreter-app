@@ -2,7 +2,7 @@ import streamlit as st
 import base64
 import io
 from PIL import Image
-import fitz  # PyMuPDF
+import pymupdf  # PyMuPDF
 from openai import OpenAI
 
 # Initialize OpenAI client from Streamlit secrets
@@ -53,10 +53,10 @@ if uploaded_file is not None:
     cols = st.columns(min(len(preview_images), 3))
     for i, img in enumerate(preview_images):
         with cols[i % len(cols)]:
-            st.image(img, caption=f"Page {i + 1}", use_container_width=True)
+            st.image(img, caption=f"Page {i + 1}", width="stretch")
 
     # Trigger interpretation
-    if st.button("Interpret Results 🚀", type="primary", use_container_width=True):
+    if st.button("Interpret Results 🚀", type="primary", width="stretch"e):
         with st.spinner("Analyzing all pages with clinical NLP..."):
             
             # Construct multimodal user message with all pages
