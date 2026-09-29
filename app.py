@@ -31,7 +31,7 @@ if uploaded_file is not None:
     # Handle PDF uploads
     if "pdf" in file_type:
         with st.spinner("Extracting PDF pages..."):
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            doc = pymupdf.open(stream=file_bytes, filetype="pdf")
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
                 # 2x zoom preserves legibility of small lab reference tables
