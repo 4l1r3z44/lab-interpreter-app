@@ -56,7 +56,7 @@ if uploaded_file is not None:
             st.image(img, caption=f"Page {i + 1}", width="stretch")
 
     # Trigger interpretation
-    if st.button("Interpret Results 🚀", type="primary", width="stretch"e):
+    if st.button("Interpret Results 🚀", type="primary", width="stretch"):
         with st.spinner("Analyzing all pages with clinical NLP..."):
             
             # Construct multimodal user message with all pages
