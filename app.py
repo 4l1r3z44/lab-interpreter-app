@@ -5,13 +5,63 @@ from PIL import Image
 import pymupdf  # PyMuPDF
 from openai import OpenAI
 
-# Initialize OpenAI client from Streamlit secrets
+# 1. Initialize OpenAI client
 client = OpenAI(
     api_key=st.secrets["AVALAI_API_KEY"],
     base_url="https://api.avalai.ir/v1"
 )
 
 st.set_page_config(page_title="Clinical Lab Interpreter", page_icon="🔬", layout="centered")
+
+# 2. Inject Persian Typography and Spacing CSS
+st.markdown("""
+<style>
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+
+/* Main container for the Persian report */
+.persian-report-container {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    font-size: 1.05rem;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-top: 15px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+/* Ensure airy line height and breathable paragraph margins */
+.persian-report-container p {
+    line-height: 2.3 !important;
+    margin-bottom: 1.6rem !important;
+    color: #1e293b;
+}
+
+/* Highlighted biomarkers/bold text */
+.persian-report-container strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+/* List items spacing */
+.persian-report-container li {
+    line-height: 2.2 !important;
+    margin-bottom: 0.75rem !important;
+}
+
+/* RTL warning styling */
+.persian-warning {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    line-height: 1.9;
+    font-size: 0.92rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🔬 Clinical Lab Interpreter")
 st.markdown("Upload lab results (**PDF** or **Image**) to generate a plain-language summary of your biomarkers.")
@@ -20,6 +70,10 @@ uploaded_file = st.file_uploader("Upload lab results", type=["pdf", "png", "jpg"
 
 def get_base64_from_image(image_bytes):
     return base64.b64encode(image_bytes).decode("utf-8")
+
+def load_prompt(filepath):
+    with open(filepath, 'r', encoding='utf-8') as file:
+        return file.read()
 
 if uploaded_file is not None:
     file_bytes = uploaded_file.getvalue()
@@ -34,7 +88,6 @@ if uploaded_file is not None:
             doc = pymupdf.open(stream=file_bytes, filetype="pdf")
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
-                # 2x zoom preserves legibility of small lab reference tables
                 pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))
                 png_bytes = pix.tobytes("png")
                 
@@ -53,17 +106,16 @@ if uploaded_file is not None:
     cols = st.columns(min(len(preview_images), 3))
     for i, img in enumerate(preview_images):
         with cols[i % len(cols)]:
-            st.image(img, caption=f"Page {i + 1}", width="stretch")
+            st.image(img, caption=f"Page {i + 1}", width='content')
 
     # Trigger interpretation
-    if st.button("Interpret Results 🚀", type="primary", width="stretch"):
+    if st.button("Interpret Results 🚀", type="primary", width='content'):
         with st.spinner("Analyzing all pages with clinical NLP..."):
             
-            # Construct multimodal user message with all pages
             user_content = [
                 {
                     "type": "text", 
-                    "text": "Please review all pages of this lab report and provide a clear, patient-friendly summary."
+                    "text": "Please review all pages of this lab report and provide a clear, patient-friendly summary in fluent Persian according to your system prompt."
                 }
             ]
             
@@ -73,26 +125,37 @@ if uploaded_file is not None:
                     "image_url": {"url": f"data:image/png;base64,{b64}"}
                 })
 
-            system_prompt = """
-            You are an empathetic medical educator helping a patient understand their lab test.
-            Your task:
-            1. Consolidate results across all pages.
-            2. Extract each biomarker, patient result, and standard reference range.
-            3. For flagged or abnormal markers, explain what the molecule does in plain English using a simple analogy.
-            4. Clarify whether it is elevated or low, but DO NOT provide differential diagnoses.
-            5. STRICT GUARDRAIL: Do not suggest medications, treatments, or dosages.
-            """
+            system_prompt = load_prompt("prompt.md")
 
             response = client.chat.completions.create(
-                model="gpt-4.1-nano-2025-04-14",
+                model="grok-4.5",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content}
                 ],
-                max_tokens=2000,
+                max_tokens=5000,
             )
 
-            st.markdown("### 📋 Plain-Language Breakdown")
-            st.markdown(response.choices[0].message.content)
+            raw_ai_text = response.choices[0].message.content
+
+            st.markdown("<h3 style='direction: rtl; text-align: right; font-family: Vazirmatn;'>📋 تحلیل و بررسی آزمایش شما</h3>", unsafe_allow_html=True)
             
-            st.warning("**Disclaimer:** This report explains medical vocabulary and reference ranges. It is not a diagnosis. Always discuss these results with your physician.")
+            # Render Markdown inside RTL container
+            # Notice the blank lines before and after raw_ai_text:
+            # this ensures the Markdown parser parses bolding and bullet points properly.
+            st.markdown(
+                f"""
+<div class="persian-report-container">
+
+{raw_ai_text}
+
+</div>
+""",
+                unsafe_allow_html=True
+            )
+            
+            # Persian Disclaimer
+            st.warning(
+                "**سلب مسئولیت پزشکی:** این گزارش صرفاً جهت آشنایی شما با مفاهیم و اصطلاحات برگه آزمایش تهیه شده و جایگزین تشخیص پزشک نیست. همیشه نتایج نهایی را با پزشک معالج خود درمیان بگذارید.",
+                icon="⚠️"
+            )
